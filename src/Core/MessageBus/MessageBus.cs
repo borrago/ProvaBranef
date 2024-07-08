@@ -23,7 +23,7 @@ public class MessageBus : IMessageBus
     {
         try
         {
-            _logger.LogInformation($"\"{nameof(PublishAsync)}\" Try publish in the broker with msg: {JsonConvert.SerializeObject(@event)}");
+            _logger.LogInformation($"\"{nameof(PublishAsync)}\" tentanod publicar a mensagem: {JsonConvert.SerializeObject(@event)}");
 
             _rabbitMqMessages.Publish(@event);
 
@@ -33,7 +33,7 @@ public class MessageBus : IMessageBus
         }
         catch (Exception e)
         {
-            var msg = $"[{nameof(PublishAsync)}]: Couldn't produce message in the broker with msg: {JsonConvert.SerializeObject(@event)} : {JsonConvert.SerializeObject(e)}";
+            var msg = $"[{nameof(PublishAsync)}]: não foi possivel publicar a mensagem: {JsonConvert.SerializeObject(@event)} : {JsonConvert.SerializeObject(e)}";
 
             _logger.LogError(msg);
 

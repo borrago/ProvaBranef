@@ -1,107 +1,88 @@
 using Application.Commands.AddClientCommand;
-using Core.MessageBus;
-using Core.MessageBus.RabbitMqMessages;
+using Core.CrossCutting;
 using Infra;
 using Infra.Repositories.ClientRepository;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi.Models;
 using MongoDB.Driver;
-using System.Reflection;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(args); builder.Services.AddControllers();
 
-builder.Services.AddControllers();
-
-builder.Services.AddEndpointsApiExplorer();
-
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "API direcionada ao cadastro de clientes", Version = "v1" });
-});
-
-builder.Services.AddSingleton<IMessageBus, MessageBus>();
-builder.Services.AddSingleton<IRabbitMqMessages, RabbitMqMessages>();
-
-builder.Services.AddMediatR(cfg =>
-{
-    cfg.RegisterServicesFromAssembly(typeof(AddClientCommandHandler).Assembly);
-});
-
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-builder.Services.AddDbContext<Context>(options =>
-    options.UseSqlServer(connectionString));
-
-builder.Services.AddSingleton<IMongoClient>(sp =>
-    new MongoClient(builder.Configuration["ReadDbSettings:DbConn"]));
-builder.Services.AddSingleton<ContextRead>();
-
-builder.Services.AddSingleton(sp =>
-{
-    var client = sp.GetRequiredService<IMongoClient>();
-    var databaseName = builder.Configuration["ReadDbSettings:DbName"];
-    return client.GetDatabase(databaseName);
-});
-
-builder.Services.AddScoped<IClientRepository, ClientRepository>();
-builder.Services.AddScoped<IClientReadRepository, ClientReadRepository>();
-
-// Configuração do CORS permitindo todas as origens
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", builder =>
-    {
-        builder.AllowAnyOrigin()
-               .AllowAnyMethod()
-               .AllowAnyHeader();
-    });
-});
-
-var assembly = AppDomain.CurrentDomain.Load("Application");
-
-var concreteBrokerTopicConsumers = assembly.ExportedTypes
-    .Select(t => t.GetTypeInfo())
-    .Where(t => t.IsClass && !t.IsAbstract)
-    .Where(t => t.IsAssignableTo(typeof(IRabbitMqSubrscriber)));
-
-foreach (var concreteBrokerTopicConsumer in concreteBrokerTopicConsumers)
-    builder.Services.AddTransient(typeof(IRabbitMqSubrscriber), concreteBrokerTopicConsumer.AsType());
-
-builder.Services.AddHostedService<RabbitMqSubscribersManager>();
+RegisterApi(builder);
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<Context>();
-    var loggerFactory = LoggerFactory.Create(builder =>
-    {
-        builder.AddConsole();
-    });
-    var logger = loggerFactory.CreateLogger<Program>();
-    try
-    {
-        dbContext.Database.Migrate();
-        logger.LogInformation("Banco de dados migrado com sucesso.");
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Ocorreu um erro ao migrar o banco de dados.");
-    }
-}
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-app.UseHttpsRedirection();
-
-// Use the CORS policy
-app.UseCors("AllowAll");
-
-app.UseAuthorization();
-
-app.MapControllers();
+UseApi(app);
 
 await app.RunAsync(new CancellationToken());
+
+
+#region Facilitadores
+static void AddConnections(WebApplicationBuilder builder)
+{
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+    builder.Services.AddDbContext<Context>(options =>
+        options.UseSqlServer(connectionString));
+
+    builder.Services.AddSingleton<IMongoClient>(sp =>
+        new MongoClient(builder.Configuration["ReadDbSettings:DbConn"]));
+    builder.Services.AddSingleton<ContextRead>();
+
+    builder.Services.AddSingleton(sp =>
+    {
+        var client = sp.GetRequiredService<IMongoClient>();
+        var databaseName = builder.Configuration["ReadDbSettings:DbName"];
+        return client.GetDatabase(databaseName);
+    });
+}
+
+static void MigrateDataBase(WebApplication app)
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<Context>();
+        var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder.AddConsole();
+        });
+        var logger = loggerFactory.CreateLogger<Program>();
+        try
+        {
+            dbContext.Database.Migrate();
+            logger.LogInformation("Banco de dados migrado com sucesso.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Ocorreu um erro ao migrar o banco de dados.");
+        }
+    }
+}
+
+static void AddRepositories(WebApplicationBuilder builder)
+{
+    builder.Services.AddScoped<IClientRepository, ClientRepository>();
+    builder.Services.AddScoped<IClientReadRepository, ClientReadRepository>();
+}
+
+static void RegisterApi(WebApplicationBuilder builder)
+{
+    builder.Services.Register();
+
+    builder.Services.AddMediatR(cfg =>
+    {
+        cfg.RegisterServicesFromAssembly(typeof(AddClientCommandHandler).Assembly);
+    });
+
+    AddConnections(builder);
+
+    AddRepositories(builder);
+}
+
+static void UseApi(WebApplication app)
+{
+    app.Use();
+
+    app.MapControllers();
+
+    MigrateDataBase(app);
+}
+#endregion
