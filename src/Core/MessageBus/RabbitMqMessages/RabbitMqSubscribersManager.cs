@@ -37,7 +37,7 @@ public class RabbitMqSubscribersManager : BackgroundService
                     channel.Value.BasicAck(ea.DeliveryTag, multiple: false);
                 };
 
-                channel.Value.BasicConsume(queue: RemoveStringSubscriver(channel.Key), autoAck: false, consumer: consumer);
+                channel.Value.BasicConsume(queue: channel.Key, autoAck: false, consumer: consumer);
             }
 
             while (!stoppingToken.IsCancellationRequested)
@@ -51,25 +51,22 @@ public class RabbitMqSubscribersManager : BackgroundService
         }
     }
 
-    private static string RemoveStringSubscriver(string input)
-        => input.Replace("Subscriber", "");
-
     private async Task ProcessMessageAsync(string message, string queueName, CancellationToken stoppingToken)
     {
         try
         {
             using var scope = _serviceProvider.CreateScope();
             var subscriber = scope.ServiceProvider.GetServices<IRabbitMqSubrscriber>()
-              .FirstOrDefault(f => _rabbitMqMessages.GetQueueName(RemoveStringSubscriver(f.ToString() ?? "")) == queueName)
+              .FirstOrDefault(f => _rabbitMqMessages.GetQueueName(f.ToString() ?? "") == queueName)
                 ?? throw new DomainException("Subscriber não encontrado.");
 
             await subscriber.Handle(message, stoppingToken);
 
-            Console.WriteLine($"Mensagem processada com sucesso: {message}");
+            Console.WriteLine($"Mensagem processada com sucesso: {queueName} => {message}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao processar mensagem: {ex.Message}");
+            Console.WriteLine($"Erro ao processar mensagem: {queueName} => {ex.Message}");
         }
     }
 }

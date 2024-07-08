@@ -37,7 +37,7 @@ public class RabbitMqMessages(IServiceProvider serviceProvider) : IRabbitMqMessa
 
         channel.BasicPublish(exchange: "", routingKey: queueName, basicProperties: null, body: body);
 
-        Console.WriteLine("Mensagem enviada! -> " + json);
+        Console.WriteLine($"Mensagem enviada! queueName: {queueName} mensagem: {json}");
     }
 
     public void Dispose()
@@ -49,7 +49,7 @@ public class RabbitMqMessages(IServiceProvider serviceProvider) : IRabbitMqMessa
     public string GetQueueName(string input)
     {
         var segments = input.Split('.');
-        return segments[2];
+        return segments[2].Replace("Subscriber", "");
     }
 
     #region Private Metods
