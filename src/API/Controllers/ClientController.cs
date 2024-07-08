@@ -1,4 +1,5 @@
-﻿using Application.Commands.AddClientCommand;
+﻿using API.Requests;
+using Application.Commands.AddClientCommand;
 using Application.Commands.DeleteClientCommand;
 using Application.Commands.UpdateClientCommand;
 using Application.Queries.GetClientByIdQuery;
@@ -15,8 +16,9 @@ public class ClientController(IMediator mediator) : ControllerBase
     private readonly IMediator _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
 
     [HttpPost]
-    public async Task<ActionResult<int>> CreateClient([FromBody] AddClientCommandInput command, CancellationToken cancellationToken)
+    public async Task<ActionResult<int>> CreateClient([FromBody] CreateUpdateClient request, CancellationToken cancellationToken)
     {
+        var command = new AddClientCommandInput(request.Nome, request.Porte);
         var client = await _mediator.Send(command, cancellationToken);
 
         if (client.Id == Guid.Empty)
@@ -25,8 +27,8 @@ public class ClientController(IMediator mediator) : ControllerBase
         return CreatedAtAction(nameof(CreateClient), client);
     }
 
-    [HttpPut("{id:guid}")]
-    public async Task<IActionResult> UpdateClient([FromRoute] Guid id, [FromBody] AddClientCommandInput request, CancellationToken cancellationToken)
+    [HttpPut("{id:Guid}")]
+    public async Task<IActionResult> UpdateClient([FromRoute] Guid id, [FromBody] CreateUpdateClient request, CancellationToken cancellationToken)
     {
         var command = new UpdateClientCommandInput(id, request.Nome, request.Porte);
         var client = await _mediator.Send(command, cancellationToken);
@@ -37,7 +39,7 @@ public class ClientController(IMediator mediator) : ControllerBase
         return Ok(client);
     }
 
-    [HttpDelete("{id:guid}")]
+    [HttpDelete("{id:Guid}")]
     public async Task<IActionResult> DeleteClient([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         var client = await _mediator.Send(new DeleteClientCommandInput(id), cancellationToken);
@@ -52,11 +54,7 @@ public class ClientController(IMediator mediator) : ControllerBase
     public async Task<ActionResult<GetClientQueryResult>> GetClients(CancellationToken cancellationToken)
         => Ok(await _mediator.Send(new GetClientQueryInput(), cancellationToken));
 
-    [HttpGet("{id:guid}")]
+    [HttpGet("{id:Guid}")]
     public async Task<ActionResult<GetClientByIdQueryResult>> GetClient([FromRoute] Guid id, CancellationToken cancellationToken)
-    {
-        var client = await _mediator.Send(new GetClientByIdQueryInput(id), cancellationToken);
-
-        return Ok(client);
-    }
+        => await _mediator.Send(new GetClientByIdQueryInput(id), cancellationToken);
 }
